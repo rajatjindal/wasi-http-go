@@ -178,11 +178,17 @@ func newBodyWriter(body types.OutgoingBody, trailer func() http.Header) *bodyWri
 // TODO: buffer writes
 func (w *bodyWriter) Write(p []byte) (n int, err error) {
 	if w.stream == cm.ResourceNone {
-		w.stream, _, _ = w.body.Write().Result()
+		fmt.Println("inside ResourceNone")
+		var isErr bool
+		var errx struct{}
+		w.stream, errx, isErr = w.body.Write().Result()
+		if isErr {
+			return 0, fmt.Errorf("what is happening here %s", errx)
+		}
 	}
 	res := w.stream.BlockingWriteAndFlush(cm.ToList(p))
 	if res.IsErr() {
-		return 0, fmt.Errorf("wasihttp: %v", res.Err())
+		return 0, fmt.Errorf("wasihttp write and flush: %v %d %t", res.Err(), len(p), w.finished)
 	}
 	return len(p), nil
 }

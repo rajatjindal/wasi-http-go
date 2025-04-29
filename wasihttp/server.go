@@ -2,6 +2,7 @@ package wasihttp
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	incominghandler "github.com/ydnar/wasi-http-go/internal/wasi/http/incoming-handler"
@@ -34,7 +35,11 @@ func handleIncomingRequest(req types.IncomingRequest, out types.ResponseOutparam
 		return // TODO: log error?
 	}
 	h.ServeHTTP(w, w.req)
-	w.finish()
+	err = w.finish()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 }
 
 var _ http.ResponseWriter = &responseWriter{}
@@ -61,6 +66,7 @@ func newResponseWriter(req types.IncomingRequest, out types.ResponseOutparam) (*
 		header: make(http.Header),
 	}
 	if err != nil {
+		fmt.Println("inside ErrorCodeHTTPProtocolError")
 		w.fatal(types.ErrorCodeHTTPProtocolError())
 	}
 	return w, err
@@ -113,6 +119,7 @@ func (w *responseWriter) finish() error {
 		// w.WriteHeader(http.StatusOK)
 		// If caller code did not set headers, status, or body, then respond with an error
 		// and let the server implementation handle the correct response.
+
 		w.fatal(types.ErrorCodeHTTPResponseIncomplete())
 		return nil
 	}
