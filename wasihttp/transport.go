@@ -1,7 +1,6 @@
 package wasihttp
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -57,36 +56,13 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil
 	})
 
+	w2.stream, _, _ = w2.body.Write().Result()
+
 	// Only copy from req.Body if it's not nil
 	if req.Body != nil {
-		fmt.Println(time.Now().Format(time.RFC3339))
-		buf := make([]byte, 4096)
-		count := 1
-		for {
-			count++
-			fmt.Println(count, " -> ", time.Now().Format(time.RFC3339))
-
-			n, err := req.Body.Read(buf)
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				fmt.Println("getting error here")
-				return nil, err
-			}
-
-			// _, err = w2.Write(buf[:n])
-			_, err = io.Copy(w2, bytes.NewReader(buf[:n]))
-			if err != nil {
-				fmt.Printf("OR >>> KKKK getting error here %#v\n", err)
-				return nil, err
-			}
+		if _, err := io.Copy(w2, NewChunkReader(req.Body)); err != nil {
+			return nil, fmt.Errorf("wasihttp io copy %s: %v", req.Method, err)
 		}
-
-		// if _, err := io.Copy(w, req.Body); err != nil {
-		// 	fmt.Println(time.Now().Format(time.RFC3339))
-		// 	return nil, fmt.Errorf("wasihttp io copy %s: %v", req.Method, err)
-		// }
 	}
 	err2 := w2.finish()
 	if err2 != nil {
@@ -130,4 +106,25 @@ func requestPath(req *http.Request) cm.Option[string] {
 		return cm.None[string]()
 	}
 	return cm.Some(path)
+}
+
+const ChunkSize = 4 * 1024 // 4KB
+
+// ChunkReader wraps an io.Reader and provides a reader that returns data in chunks.
+type ChunkReader struct {
+	src io.Reader
+}
+
+func NewChunkReader(src io.Reader) *ChunkReader {
+	return &ChunkReader{src: src}
+}
+
+func (cr *ChunkReader) Read(p []byte) (n int, err error) {
+	fmt.Println(time.Now(), " -> ", "reading")
+	if len(p) > ChunkSize {
+		p = p[:ChunkSize] // limit read to 4KB
+	}
+	read, err := cr.src.Read(p)
+	fmt.Println(time.Now(), " -> ", read, err)
+	return read, err
 }

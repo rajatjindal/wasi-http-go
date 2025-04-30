@@ -160,6 +160,7 @@ var (
 )
 
 type bodyWriter struct {
+	started  bool
 	body     types.OutgoingBody
 	trailer  func() http.Header
 	stream   streams.OutputStream
@@ -169,6 +170,7 @@ type bodyWriter struct {
 // newBodyWriter takes ownership of body, allowing it to be written to.
 // Call finish to send the HTTP trailers provided by the trailer callback.
 func newBodyWriter(body types.OutgoingBody, trailer func() http.Header) *bodyWriter {
+	fmt.Println("calling newBodyWriter constructor")
 	return &bodyWriter{
 		body:    body,
 		trailer: trailer,
@@ -177,17 +179,25 @@ func newBodyWriter(body types.OutgoingBody, trailer func() http.Header) *bodyWri
 
 // TODO: buffer writes
 func (w *bodyWriter) Write(p []byte) (n int, err error) {
-	if w.stream == cm.ResourceNone {
-		fmt.Println("inside ResourceNone")
-		var isErr bool
-		var errx struct{}
-		w.stream, errx, isErr = w.body.Write().Result()
-		if isErr {
-			return 0, fmt.Errorf("what is happening here %s", errx)
-		}
-	}
+	// if w.stream == cm.ResourceNone && w.started {
+	// 	return 0, nil
+	// }
+
+	// if w.stream == cm.ResourceNone {
+	// 	w.started = true
+	// 	fmt.Println("inside ResourceNone")
+	// 	var isErr bool
+	// 	var errx struct{}
+	// 	w.stream, errx, isErr = w.body.Write().Result()
+	// 	if isErr {
+	// 		return 0, fmt.Errorf("what is happening here %s", errx)
+	// 	}
+	// }
+	fmt.Printf("about to write %d\n", len(p))
 	res := w.stream.BlockingWriteAndFlush(cm.ToList(p))
 	if res.IsErr() {
+		if res.Err().Closed() {
+		}
 		return 0, fmt.Errorf("wasihttp write and flush: %v %d %t", res.Err(), len(p), w.finished)
 	}
 	return len(p), nil
